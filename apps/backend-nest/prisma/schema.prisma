@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  fullName     String
+  email        String   @unique
+  phone        String?  @unique
+  role         String
+  passwordHash String   @default("")
+  createdAt    DateTime @default(now())
+  artist       Artist?
+  purchases    Purchase[]
+  playlists    Playlist[]
+  favorites    Favorite[]
+  followers    Follower[] @relation("UserFollowers")
+  sessions     Session[]
+  notifications Notification[]
+  devices      Device[]
+  streams      Stream[]
+  auditLogs    AuditLog[]
+}
+
+model Artist {
+  id               String      @id @default(cuid())
+  userId           String?     @unique
+  user             User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  genre            String?
+  city             String?
+  payoutPhone      String?
+  verified         Boolean     @default(false)
+  followersCount   Int         @default(0)
+  walletBalanceCdf  BigInt      @default(0)
+  songs            Song[]
+  albums           Album[]
+  followers        Follower[]
+  withdrawals      Withdrawal[]
+  createdAt        DateTime    @default(now())
+}
+
+model Song {
+  id               String      @id @default(cuid())
+  artistId         String
+  artistRecord     Artist      @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artist           String
+  title            String
+  albumTitle       String?
+  genre            String?
+  durationSeconds  Int
+  priceCdf         Int
+  artistShareBps   Int         @default(7000)
+  streams          Int         @default(0)
+  isPublished      Boolean     @default(false)
+  audioPath        String
+  coverPath        String?
+  createdAt        DateTime    @default(now())
+  purchases        Purchase[]
+  favorites        Favorite[]
+  playlistSongs    PlaylistSong[]
+  streamEvents     Stream[]
+}
+
+model Album {
+  id          String   @id @default(cuid())
+  artistId    String
+  artist      Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  title       String
+  coverPath   String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([artistId, title])
+}
+
+model Genre {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Purchase {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songId     String
+  song       Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  method     String
+  operator   String?
+  payerPhone String?
+  merchantPhone String?
+  transferReference String?
+  amountCdf  Int
+  status     String
+  provider   String?
+  providerReference String? @unique
+  checkoutUrl String?
+  paidAt     DateTime?
+  createdAt  DateTime @default(now())
+  downloads  Download[]
+}
+
+model Download {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  deviceId    String
+  downloadedAt DateTime @default(now())
+}
+
+model Playlist {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  createdAt   DateTime @default(now())
+  songs       PlaylistSong[]
+}
+
+model PlaylistSong {
+  playlistId  String
+  playlist    Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  position    Int
+
+  @@id([playlistId, songId])
+}
+
+model Favorite {
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songId     String
+  song       Song   @relation(fields: [songId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([userId, songId])
+}
+
+model Follower {
+  followerUserId String
+  follower       User   @relation("UserFollowers", fields: [followerUserId], references: [id], onDelete: Cascade)
+  artistId       String
+  artist         Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@id([followerUserId, artistId])
+}
+
+model Withdrawal {
+  id          String   @id @default(cuid())
+  artistId    String
+  artist      Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  payoutPhone String?
+  amountCdf   BigInt
+  status      String
+  requestedAt DateTime @default(now())
+  paidAt      DateTime?
+}
+
+model Stream {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songId    String
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([songId, createdAt])
+}
+
+model Device {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceKey   String
+  platform    String?
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, deviceKey])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}
+
+model Claim {
+  id        String   @id @default(cuid())
+  title     String
+  artist    String
+  priority  String
+  status    String
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  createdAt DateTime @default(now())
+}

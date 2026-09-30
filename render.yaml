@@ -1,0 +1,59 @@
+services:
+  - type: web
+    name: muziki-backend
+    runtime: node
+    rootDir: apps/backend-nest
+    plan: free
+    buildCommand: npm install && npm run prisma:generate && npx prisma db push && npm run build
+    startCommand: node dist/main.js
+    healthCheckPath: /health
+    disk:
+      name: muziki-storage
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: muziki-db
+          property: connectionString
+      - key: MUZIKI_STORAGE_ROOT
+        value: /var/data/storage
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MUZIKI_MINIMUM_WITHDRAWAL_CDF
+        value: "20000"
+      - key: MUZIKI_ALLOWED_ORIGINS
+        value: "https://muziki-listener-portal.onrender.com,https://muziki-artist-portal.onrender.com,https://muziki-admin-portal.onrender.com"
+      - key: MUZIKI_ADMIN_EMAIL
+        sync: false
+      - key: MUZIKI_ADMIN_PASSWORD
+        sync: false
+      - key: DRC_VODACOM_MERCHANT_PHONE
+        value: "+243 834 574 609"
+      - key: DRC_AIRTEL_MERCHANT_PHONE
+        value: "+243 992 313 395"
+      - key: DRC_ORANGE_MERCHANT_PHONE
+        sync: false
+      - key: DRC_AFRICELL_MERCHANT_PHONE
+        sync: false
+
+  - type: web
+    name: muziki-listener-portal
+    runtime: static
+    staticPublishPath: apps/listener-portal
+
+  - type: web
+    name: muziki-artist-portal
+    runtime: static
+    staticPublishPath: apps/artist-portal
+
+  - type: web
+    name: muziki-admin-portal
+    runtime: static
+    staticPublishPath: apps/admin-portal
+
+databases:
+  - name: muziki-db
+    plan: free
+    databaseName: muziki
+    user: muziki

@@ -1,0 +1,18 @@
+{
+  "name": "muziki",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm --workspace apps/backend run start",
+    "dev:backend-nest": "npm --workspace apps/backend-nest run start:dev",
+    "build:backend-nest": "npm --workspace apps/backend-nest run build",
+    "seed:backend-nest": "npm --workspace apps/backend-nest run prisma:seed",
+    "serve:artist-portal": "node scripts/serve-static.mjs apps/artist-portal 4173",
+    "serve:listener-portal": "node scripts/serve-static.mjs apps/listener-portal 4175",
+    "prisma:generate": "npm --workspace apps/backend-nest run prisma:generate",
+    "prisma:migrate": "npm --workspace apps/backend-nest run prisma:migrate"
+  }
+}

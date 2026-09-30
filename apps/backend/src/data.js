@@ -1,0 +1,13 @@
+export const artists = [];
+export const users = [];
+export const songs = [];
+export const purchases = [];
+export const claims = [];
+export const withdrawals = [];
+export const notifications = [];
+export const sessions = [];
+export const playlists = [];
+export const playlistSongs = [];
+export const favorites = [];
+export const followers = [];
+export const downloads = [];

@@ -1,0 +1,8 @@
+{
+  "name": "@muziki/backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/main.js"
+  }
+}
