@@ -15,6 +15,7 @@ const state = {
   query: "",
   genre: "All",
   authMode: "login",
+  authNotice: "",
   currentUser: storage.get("muziki-artist-portal-user", null),
   sessionToken: storage.get("muziki-artist-portal-token", ""),
   artists: cleanArtists(storage.get("muziki-artist-portal-artists", [])),
@@ -28,6 +29,10 @@ const state = {
 const genres = ["All", "Rumba Fusion", "Afrobeats", "Ndombolo", "Soukous"];
 const root = document.getElementById("app");
 const fmt = new Intl.NumberFormat("fr-CD");
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char);
+}
 
 function slugify(value) {
   return String(value || "track")
@@ -113,21 +118,28 @@ async function authenticate(event) {
   const payoutPhone = String(form.get("payoutPhone") || "").trim();
   const password = String(form.get("password") || "");
   if (!email || !password) return;
-  const path = state.authMode === "login" ? "/api/auth/login" : "/api/auth/register";
-  const payload = state.authMode === "login" ? { email, password } : { fullName, email, password, role: "artist", phone: payoutPhone, payoutPhone };
+  const registering = state.authMode === "register";
+  const path = registering ? "/api/auth/register" : "/api/auth/login";
+  const payload = registering ? { fullName, email, password, role: "artist", phone: payoutPhone, payoutPhone } : { email, password };
   try {
     const response = await fetch(`${API_BASE}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    if (!response.ok) throw new Error(`Auth failed (${response.status})`);
     const data = await response.json();
-    if (data.error) throw new Error(data.error);
+    if (!response.ok) throw new Error(data.message || `Auth failed (${response.status})`);
+    if (registering) {
+      state.authMode = "login";
+      state.authNotice = "Account created. Check your email and confirm your address before signing in.";
+      render();
+      return;
+    }
     state.currentUser = data.user;
     state.sessionToken = data.session?.token || "";
   } catch (error) {
-    toast("Sign in failed", String(error.message || error));
+    state.authNotice = String(error.message || error);
+    render();
     return;
   }
   ensureArtistProfile(fullName, payoutPhone);
@@ -319,6 +331,7 @@ function render() {
               <button class="${state.authMode === "login" ? "primary" : "ghost"}" data-action="auth-mode" data-mode="login">Log in</button>
               <button class="${isRegister ? "primary" : "ghost"}" data-action="auth-mode" data-mode="register">Create account</button>
             </div>
+            ${state.authNotice ? `<div class="row-card" role="status">${escapeHtml(state.authNotice)}</div>` : ""}
             <form class="stack" id="auth-form">
               ${isRegister ? `
                 <div class="field">
@@ -350,6 +363,7 @@ function render() {
       if (button.dataset.action === "set-api-base") setApiBase();
       if (button.dataset.action === "auth-mode") {
         state.authMode = button.dataset.mode || "login";
+        state.authNotice = "";
         render();
       }
     }));

@@ -26,7 +26,9 @@ const operators = ["Vodacom", "Airtel", "Orange", "Africell"];
 const state = {
   query: "",
   genre: "All",
-  authMode: "login",
+  authMode: new URLSearchParams(window.location.search).has("reset") ? "reset" : "login",
+  resetToken: new URLSearchParams(window.location.search).get("reset") || "",
+  authNotice: "",
   currentUser: storage.get("muziki-listener-user", null),
   sessionToken: storage.get("muziki-listener-token", ""),
   loading: true,
@@ -39,6 +41,10 @@ const state = {
 };
 
 const fmt = new Intl.NumberFormat("fr-CD");
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char);
+}
 
 function songArtist(song) {
   return song.artist || song.artistName || "Unknown artist";
@@ -93,6 +99,19 @@ function setApiBase() {
 
 async function bootstrap() {
   try {
+    const params = new URLSearchParams(window.location.search);
+    const verificationToken = params.get("verify");
+    const resetToken = params.get("reset");
+    if (verificationToken) {
+      const response = await fetch(`${API_BASE}/api/auth/verify-email`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: verificationToken })
+      });
+      const result = await response.json();
+      state.authNotice = response.ok ? "Your email is verified. You can now sign in." : (result.message || "This verification link is invalid or expired.");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (resetToken) {
+      state.authMode = "reset";
+    }
     const response = await fetch(`${API_BASE}/api/bootstrap`);
     if (!response.ok) return;
     const data = await response.json();
@@ -126,22 +145,39 @@ async function authenticate(event) {
   const email = String(form.get("email") || "").trim().toLowerCase();
   const fullName = String(form.get("fullName") || "").trim();
   const password = String(form.get("password") || "");
-  if (!email || !password) return;
-  const path = state.authMode === "login" ? "/api/auth/login" : "/api/auth/register";
-  const payload = state.authMode === "login" ? { email, password } : { fullName, email, password, role: "listener", phone: "" };
+  const modes = {
+    login: { path: "/api/auth/login", payload: { email, password } },
+    register: { path: "/api/auth/register", payload: { fullName, email, password, role: "listener", phone: "" } },
+    forgot: { path: "/api/auth/forgot-password", payload: { email } },
+    reset: { path: "/api/auth/reset-password", payload: { token: state.resetToken, password } }
+  };
+  const request = modes[state.authMode] || modes.login;
+  if (state.authMode !== "reset" && !email) return;
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
+    const response = await fetch(`${API_BASE}${request.path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(request.payload)
     });
-    if (!response.ok) throw new Error(`Auth failed (${response.status})`);
     const data = await response.json();
-    if (data.error) throw new Error(data.error);
-    state.currentUser = data.user;
-    state.sessionToken = data.session?.token || "";
+    if (!response.ok) throw new Error(data.message || "Request failed");
+    if (state.authMode === "register") {
+      state.authMode = "login";
+      state.authNotice = "Account created. Check your inbox and confirm your email before signing in.";
+    } else if (state.authMode === "forgot") {
+      state.authNotice = data.message;
+    } else if (state.authMode === "reset") {
+      state.authMode = "login";
+      state.resetToken = "";
+      state.authNotice = "Password updated. You can now sign in.";
+      window.history.replaceState({}, "", window.location.pathname);
+    } else {
+      state.currentUser = data.user;
+      state.sessionToken = data.session?.token || "";
+    }
   } catch (error) {
-    toast("Sign in failed", String(error.message || error));
+    state.authNotice = String(error.message || error);
+    render();
     return;
   }
   persist();
@@ -395,6 +431,8 @@ function render() {
 
   if (!state.currentUser) {
     const isRegister = state.authMode === "register";
+    const isForgot = state.authMode === "forgot";
+    const isReset = state.authMode === "reset";
     root.innerHTML = `
       <div class="shell auth-shell">
         <header class="topbar">
@@ -411,30 +449,35 @@ function render() {
           <section>
             <div class="eyebrow">Listener account</div>
             <h1>Enter the catalog with your listener account.</h1>
-            <p>Use one email for your purchases so approved songs and albums can be unlocked for the right account.</p>
+            <p>Use your email to secure your account, recover your password, and find your approved music purchases.</p>
           </section>
           <section class="panel section auth-card">
-            <div class="auth-tabs">
-              <button class="${state.authMode === "login" ? "primary" : "ghost"}" data-action="auth-mode" data-mode="login">Log in</button>
-              <button class="${isRegister ? "primary" : "ghost"}" data-action="auth-mode" data-mode="register">Create account</button>
-            </div>
+            ${isForgot || isReset ? `<div class="auth-tabs"><button class="ghost" data-action="auth-mode" data-mode="login">Back to sign in</button></div>` : `
+              <div class="auth-tabs">
+                <button class="${state.authMode === "login" ? "primary" : "ghost"}" data-action="auth-mode" data-mode="login">Log in</button>
+                <button class="${isRegister ? "primary" : "ghost"}" data-action="auth-mode" data-mode="register">Create account</button>
+              </div>`}
+            <h2>${isForgot ? "Recover your account" : isReset ? "Choose a new password" : isRegister ? "Create your listener account" : "Welcome back"}</h2>
+            <p class="muted">${isRegister ? "Your email is required. We will send a confirmation link before your account can sign in." : isForgot ? "Enter the email address linked to your account. We will send a password reset link." : isReset ? "Choose a new password with at least 8 characters." : "Sign in with the email address you registered."}</p>
+            ${state.authNotice ? `<div class="row-card" role="status">${escapeHtml(state.authNotice)}</div>` : ""}
             <form class="stack" id="auth-form">
               ${isRegister ? `
                 <div class="field">
                   <label class="muted">Full name</label>
-                  <input name="fullName" placeholder="Your name" required />
+                  <input name="fullName" autocomplete="name" placeholder="Your name" required />
                 </div>
               ` : ""}
-              <div class="field">
-                <label class="muted">Email</label>
-                <input name="email" type="email" placeholder="your@email.com" required />
-              </div>
-              <div class="field">
-                <label class="muted">Password</label>
-                <input name="password" type="password" minlength="8" placeholder="At least 8 characters" required />
-              </div>
-              <button class="primary" type="submit">${isRegister ? "Create account" : "Log in"}</button>
+              ${!isReset ? `<div class="field">
+                  <label class="muted">Email</label>
+                  <input name="email" type="email" autocomplete="email" placeholder="your@email.com" required />
+              </div>` : ""}
+              ${!isForgot ? `<div class="field">
+                  <label class="muted">Password</label>
+                  <input name="password" type="password" autocomplete="${isRegister || isReset ? "new-password" : "current-password"}" minlength="8" placeholder="At least 8 characters" required />
+              </div>` : ""}
+              <button class="primary" type="submit">${isRegister ? "Create account" : isForgot ? "Send reset link" : isReset ? "Update password" : "Log in"}</button>
             </form>
+            ${state.authMode === "login" ? `<button class="ghost" data-action="auth-mode" data-mode="forgot" style="width:100%;margin-top:12px">Forgot password?</button>` : ""}
           </section>
         </main>
       </div>
@@ -445,6 +488,7 @@ function render() {
       if (button.dataset.action === "set-api-base") setApiBase();
       if (button.dataset.action === "auth-mode") {
         state.authMode = button.dataset.mode || "login";
+        state.authNotice = "";
         render();
       }
     }));

@@ -14,6 +14,7 @@ model User {
   phone        String?  @unique
   role         String
   passwordHash String   @default("")
+  emailVerifiedAt DateTime? @default(now())
   createdAt    DateTime @default(now())
   artist       Artist?
   purchases    Purchase[]
@@ -25,6 +26,20 @@ model User {
   devices      Device[]
   streams      Stream[]
   auditLogs    AuditLog[]
+  emailTokens  EmailToken[]
+}
+
+model EmailToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  purpose   String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, purpose])
 }
 
 model Artist {

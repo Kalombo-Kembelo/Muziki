@@ -19,7 +19,17 @@ services:
       - key: MUZIKI_MINIMUM_WITHDRAWAL_CDF
         value: "20000"
       - key: MUZIKI_ALLOWED_ORIGINS
-        value: "https://muziki-listener-portal.onrender.com,https://muziki-artist-portal.onrender.com,https://muziki-admin-portal.onrender.com"
+        value: "https://muziki.onrender.com,https://muziki-listener-portal.onrender.com,https://muziki-artist-portal.onrender.com,https://muziki-admin-portal.onrender.com"
+      - key: MUZIKI_LISTENER_URL
+        value: "https://muziki.onrender.com"
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        value: kalombobillgate@gmail.com
+      - key: SMTP_APP_PASSWORD
+        sync: false
       - key: MUZIKI_ADMIN_EMAIL
         value: "kalombobillgate@gmail.com"
       - key: MUZIKI_ADMIN_PASSWORD
